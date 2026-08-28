@@ -1,0 +1,50 @@
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  IMAGE_NAME: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+
+build-app:
+  stage: build
+
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+
+  script:
+    - docker build -t "$IMAGE_NAME" .
+    - docker push "$IMAGE_NAME"
+
+test-app:
+  stage: test
+
+  script:
+    - docker run -d
+        --name automated-anchor-test
+        -p 8000:8000
+        "$IMAGE_NAME"
+    - sleep 5
+    - docker exec automated-anchor-test pytest test_main.py
+
+  after_script:
+    - docker rm -f automated-anchor-test
+    - docker rmi "$IMAGE_NAME"
+
+
+deploy-app:
+  stage: deploy
+
+  only:
+    - develop
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+
+  script:
+    - docker run -d --name automated-anchor --restart always -p 8000:8000 "$IMAGE_NAME"
+
+  after_script:
+    - echo "========== Deployment Logs =========="
+    - docker logs --tail 100 automated-anchor
+```
+
