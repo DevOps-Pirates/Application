@@ -1,0 +1,21 @@
+security_scan:
+  stage: pull_and_scan
+  image: docker.arvancloud.ir/aquasec/trivy:latest
+  needs:
+    - build_image
+
+  script:
+    - echo "Logging in to GitLab Container Registry..."
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+
+    - docker pull "$IMAGE_TAG"
+
+    - trivy image --severity CRITICAL --exit-code 1 "$IMAGE_TAG" > trivy-report.log 2>&1 || TRIVY_EXIT_CODE=$?
+
+    - exit ${TRIVY_EXIT_CODE:-0}
+
+  artifacts:
+    when: always
+    paths:
+      - trivy-report.log
+    expire_in: 7 days
